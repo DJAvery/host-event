@@ -8,11 +8,28 @@ import Flyer from "./Flyer";
 type SubmitState = "idle" | "submitting" | "completed" | "error";
 type CompletedKind = "sent" | "simulated" | "sms_failed" | "duplicate";
 
-const COMPLETED_COPY: Record<CompletedKind, { emoji: string; heading: string; subheading?: string }> = {
-  sent: { emoji: "🧸🎀", heading: "Thank You! 🧸🎀", subheading: "You're RSVP'd!" },
-  simulated: { emoji: "🧸🎀", heading: "Thank You! 🧸🎀", subheading: "You're RSVP'd!" },
-  sms_failed: { emoji: "🧸", heading: "Your RSVP Was Received" },
-  duplicate: { emoji: "💕", heading: "You're Already RSVP'd" },
+const COMPLETED_COPY: Record<
+  CompletedKind,
+  { emoji: string; heading: string; subheading?: string }
+> = {
+  sent: {
+    emoji: "🧸🎀",
+    heading: "Thank You! 🧸🎀",
+    subheading: "You're RSVP'd!",
+  },
+  simulated: {
+    emoji: "🧸🎀",
+    heading: "Thank You! 🧸🎀",
+    subheading: "You're RSVP'd!",
+  },
+  sms_failed: {
+    emoji: "🧸",
+    heading: "Your RSVP Was Received",
+  },
+  duplicate: {
+    emoji: "💕",
+    heading: "You're Already RSVP'd",
+  },
 };
 
 export default function RsvpFlow({ event }: { event: EventConfig }) {
@@ -20,9 +37,11 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
   const [phone, setPhone] = useState("");
   const [rsvpStatus, setRsvpStatus] = useState<"yes" | "no" | "">("");
   const [message, setMessage] = useState("");
+  const [smsOptIn, setSmsOptIn] = useState(false);
 
   const [state, setState] = useState<SubmitState>("idle");
-  const [completedKind, setCompletedKind] = useState<CompletedKind>("sent");
+  const [completedKind, setCompletedKind] =
+    useState<CompletedKind>("sent");
   const [resultMessage, setResultMessage] = useState("");
   const submittingRef = useRef(false);
 
@@ -36,6 +55,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
       setResultMessage("Please enter your full name.");
       return;
     }
+
     if (!normalizePhoneToE164(phone)) {
       setState("error");
       setResultMessage(
@@ -43,6 +63,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
       );
       return;
     }
+
     if (rsvpStatus === "") {
       setState("error");
       setResultMessage("Please let us know if you'll be attending.");
@@ -56,23 +77,36 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
     try {
       const response = await fetch(`/api/events/${event.slug}/rsvp`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, phone, rsvpStatus, message }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName,
+          phone,
+          rsvpStatus,
+          message,
+          smsOptIn,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         setState("error");
-        setResultMessage(data.error ?? "Something went wrong. Please try again.");
+        setResultMessage(
+          data.error ?? "Something went wrong. Please try again."
+        );
         submittingRef.current = false;
         return;
       }
 
       const kind: CompletedKind =
-        data.status === "simulated" || data.status === "sms_failed" || data.status === "duplicate"
+        data.status === "simulated" ||
+        data.status === "sms_failed" ||
+        data.status === "duplicate"
           ? data.status
           : "sent";
+
       setCompletedKind(kind);
       setResultMessage(data.message ?? "");
       setState("completed");
@@ -87,20 +121,24 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
 
   if (state === "completed") {
     const copy = COMPLETED_COPY[completedKind];
+
     return (
       <div>
         <div className="animate-pop-in mx-auto max-w-xl rounded-3xl border border-pink-200 bg-white p-8 text-center shadow-xl shadow-pink-100 sm:p-12">
           <span aria-hidden="true" className="text-5xl">
             {copy.emoji}
           </span>
+
           <h2 className="mt-4 text-3xl font-bold text-brown-700">
             {copy.heading}
           </h2>
+
           {copy.subheading && (
             <p className="mt-2 text-xl font-semibold text-pink-600">
               {copy.subheading}
             </p>
           )}
+
           <p className="mt-4 text-lg text-brown-600">
             {completedKind === "sent"
               ? "Your private invitation has been sent to the phone number you entered."
@@ -126,6 +164,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
         <h1 className="font-script text-4xl text-pink-600 sm:text-5xl">
           RSVP &amp; Get Your Invite 🧸🎀
         </h1>
+
         <p className="mt-3 text-brown-500">
           Fill out your information below and we&apos;ll send your private
           baby shower invitation directly to your phone.
@@ -144,6 +183,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
           >
             Full Name
           </label>
+
           <input
             id="fullName"
             name="fullName"
@@ -164,6 +204,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
           >
             Phone Number
           </label>
+
           <input
             id="phone"
             name="phone"
@@ -177,8 +218,10 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
             placeholder="(555) 555-5555"
             aria-describedby="phone-hint"
           />
+
           <p id="phone-hint" className="mt-1 text-sm text-brown-400">
-            Your invitation will be texted to this exact number.
+            Your invitation will be texted to this exact number if you opt in
+            to SMS below.
           </p>
         </div>
 
@@ -186,6 +229,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
           <legend className="block text-base font-semibold text-brown-700">
             Will you be attending?
           </legend>
+
           <div className="mt-2 flex flex-col gap-3 sm:flex-row">
             <label className="flex min-h-12 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-beige-200 bg-cream-50 px-4 has-[:checked]:border-pink-400 has-[:checked]:bg-blush-100">
               <input
@@ -197,8 +241,12 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
                 className="h-5 w-5 accent-pink-500"
                 required
               />
-              <span className="text-brown-700">Yes, I&apos;ll be there!</span>
+
+              <span className="text-brown-700">
+                Yes, I&apos;ll be there!
+              </span>
             </label>
+
             <label className="flex min-h-12 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-beige-200 bg-cream-50 px-4 has-[:checked]:border-pink-400 has-[:checked]:bg-blush-100">
               <input
                 type="radio"
@@ -208,7 +256,10 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
                 onChange={() => setRsvpStatus("no")}
                 className="h-5 w-5 accent-pink-500"
               />
-              <span className="text-brown-700">Sorry, I can&apos;t make it</span>
+
+              <span className="text-brown-700">
+                Sorry, I can&apos;t make it
+              </span>
             </label>
           </div>
         </fieldset>
@@ -219,8 +270,11 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
             className="block text-base font-semibold text-brown-700"
           >
             Message to the Hosts{" "}
-            <span className="font-normal text-brown-400">(optional)</span>
+            <span className="font-normal text-brown-400">
+              (optional)
+            </span>
           </label>
+
           <textarea
             id="message"
             name="message"
@@ -242,6 +296,7 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
               <br />
               {event.privateMessage}
             </li>
+
             <li>
               <span className="font-bold text-pink-600">
                 👥 Extra Guests
@@ -249,16 +304,21 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
               <br />
               {event.extraGuestMessage}
             </li>
+
             <li>
-              <span className="font-bold text-pink-600">🚗 Parking</span>
+              <span className="font-bold text-pink-600">
+                🚗 Parking
+              </span>
               <br />
               {event.parkingMessage}
             </li>
           </ul>
+
           <p className="mt-3 font-semibold">
             Hosts:
             <br />
             {event.hostPhone1}
+
             {event.hostPhone2 && (
               <>
                 <br />
@@ -266,6 +326,26 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
               </>
             )}
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-pink-200 bg-pink-50 p-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              id="smsOptIn"
+              name="smsOptIn"
+              checked={smsOptIn}
+              onChange={(event) => setSmsOptIn(event.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0 accent-pink-500"
+            />
+
+            <span className="text-sm leading-relaxed text-brown-600 sm:text-base">
+              I agree to receive SMS messages from HostBabyShower about my
+              RSVP, private invitation, reminders, and event updates.
+              Message frequency varies. Message and data rates may apply.
+              Reply STOP to opt out. Consent is not required to RSVP.
+            </span>
+          </label>
         </div>
 
         {state === "error" && (
@@ -282,7 +362,9 @@ export default function RsvpFlow({ event }: { event: EventConfig }) {
           disabled={state === "submitting"}
           className="flex min-h-14 w-full items-center justify-center rounded-full bg-pink-500 text-lg font-bold text-white shadow-lg shadow-pink-300/50 transition-transform hover:scale-[1.02] hover:bg-pink-600 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pink-600"
         >
-          {state === "submitting" ? "Sending your invitation…" : "SEND MY INVITE 💕"}
+          {state === "submitting"
+            ? "Sending your invitation…"
+            : "SEND MY INVITE 💕"}
         </button>
       </form>
     </div>
